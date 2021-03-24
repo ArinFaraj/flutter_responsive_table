@@ -20,11 +20,13 @@ class ResponsiveDatatable extends StatefulWidget {
   final String? sortColumn;
   final bool? sortAscending;
   final bool isLoading;
+  final bool scrollbarAlwaysShown;
   final bool autoHeight;
   final bool hideUnderline;
   final List<bool>? expanded;
   final Function? dropContainer;
   final ScrollController desktopScrollController;
+  final ScrollController desktopHorizontalScrollController;
   final Color desktopHeaderTopBorderColor;
   final Color headerBorderColor;
   final Color rowBorderDarkColor;
@@ -47,6 +49,7 @@ class ResponsiveDatatable extends StatefulWidget {
     this.sortColumn,
     this.sortAscending,
     this.isLoading: false,
+    this.scrollbarAlwaysShown: false,
     this.autoHeight: true,
     this.hideUnderline: true,
     this.expanded,
@@ -57,9 +60,11 @@ class ResponsiveDatatable extends StatefulWidget {
     Color? rowBorderDarkColor,
     Color? rowBorderLightColor,
     ScrollController? desktopScrollController,
+    ScrollController? desktopHorizontalScrollController,
   })  : this.rowBorderDarkColor = rowBorderDarkColor ?? Colors.grey[800]!,
         this.rowBorderLightColor = rowBorderLightColor ?? Colors.grey[300]!,
         this.desktopScrollController = desktopScrollController ?? ScrollController(),
+        this.desktopHorizontalScrollController = desktopHorizontalScrollController ?? ScrollController(),
         super(key: key);
 
   @override
@@ -209,36 +214,44 @@ class _ResponsiveDatatableState extends State<ResponsiveDatatable> {
           ...widget.headers!
               .where((header) => header.show == true)
               .map(
-                (header) => Expanded(
-                    flex: header.flex ?? 1,
-                    child: InkWell(
-                      onTap: () {
-                        if (widget.onSort != null && header.sortable!) widget.onSort!(header.value);
-                      },
-                      child: header.headerBuilder != null
-                          ? header.headerBuilder!(header.value)
-                          : Container(
-                              padding: EdgeInsets.all(11),
-                              alignment: headerAlignSwitch(header.textAlign),
-                              child: Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    "${header.text}",
-                                    textAlign: header.textAlign,
-                                  ),
-                                  if (widget.sortColumn != null && widget.sortColumn == header.value)
-                                    widget.sortAscending!
-                                        ? Icon(Icons.arrow_downward, size: 15)
-                                        : Icon(Icons.arrow_upward, size: 15)
-                                ],
-                              ),
-                            ),
-                    )),
+                (header) => header.minWidth == 0
+                    ? Expanded(
+                        flex: header.flex ?? 1,
+                        child: desktopHead(header),
+                      )
+                    : SizedBox(
+                        width: header.minWidth,
+                        child: desktopHead(header),
+                      ),
               )
               .toList()
         ],
       ),
+    );
+  }
+
+  InkWell desktopHead(DatatableHeader header) {
+    return InkWell(
+      onTap: () {
+        if (widget.onSort != null && header.sortable!) widget.onSort!(header.value);
+      },
+      child: header.headerBuilder != null
+          ? header.headerBuilder!(header.value)
+          : Container(
+              padding: EdgeInsets.all(11),
+              alignment: headerAlignSwitch(header.textAlign),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    "${header.text}",
+                    textAlign: header.textAlign,
+                  ),
+                  if (widget.sortColumn != null && widget.sortColumn == header.value)
+                    widget.sortAscending! ? Icon(Icons.arrow_downward, size: 15) : Icon(Icons.arrow_upward, size: 15)
+                ],
+              ),
+            ),
     );
   }
 
@@ -287,34 +300,43 @@ class _ResponsiveDatatableState extends State<ResponsiveDatatable> {
                   ...widget.headers!
                       .where((header) => header.show == true)
                       .map(
-                        (header) => Expanded(
-                          flex: header.flex ?? 1,
-                          child: header.sourceBuilder != null
-                              ? header.sourceBuilder!(data[header.value], data)
-                              : header.editable
-                                  ? editAbleWidget(
-                                      data: data,
-                                      header: header,
-                                      textAlign: header.textAlign!,
-                                    )
-                                  : Container(
-                                      child: Text(
-                                        "${data[header.value]}",
-                                        textAlign: header.textAlign,
-                                      ),
-                                    ),
-                        ),
+                        (header) => header.minWidth == 0
+                            ? Expanded(
+                                flex: header.flex ?? 1,
+                                child: desktopCell(header, data),
+                              )
+                            : SizedBox(
+                                width: header.minWidth,
+                                child: desktopCell(header, data),
+                              ),
                       )
                       .toList()
                 ],
               ),
             ),
           ),
-          widget.expanded != null && widget.expanded![index] ? widget.dropContainer!(data) : Container()
+          widget.expanded != null && widget.expanded![index] ? widget.dropContainer!(data) : SizedBox()
         ],
       ));
     }
     return widgets;
+  }
+
+  Widget desktopCell(DatatableHeader header, Map<String, dynamic> data) {
+    return header.sourceBuilder != null
+        ? header.sourceBuilder!(data[header.value], data)
+        : header.editable
+            ? editAbleWidget(
+                data: data,
+                header: header,
+                textAlign: header.textAlign!,
+              )
+            : Container(
+                child: Text(
+                  "${data[header.value]}",
+                  textAlign: header.textAlign,
+                ),
+              );
   }
 
   Widget editAbleWidget({
@@ -343,9 +365,13 @@ class _ResponsiveDatatableState extends State<ResponsiveDatatable> {
 
   @override
   Widget build(BuildContext context) {
-    final minWidth =
-        widget.headers?.map((e) => e.flex ?? 1 * 110).toList().reduce((value, element) => value + element).toDouble() ??
-            100.0;
+    final minWidth = widget.headers
+            ?.map((e) => e.minWidth != 0 ? e.minWidth : (e.flex ?? 1 * 120))
+            .toList()
+            .reduce((value, element) => value + element)
+            .toDouble() ??
+        100.0;
+    //widget.expanded = widget.expanded != null? List.generate(widget.source.length, (index) => widget.expanded[index]??false)
 
     return widget.shouldUseSmallScreen && (context.isExtraSmall || context.isSmall || context.isMedium)
         ?
@@ -408,43 +434,46 @@ class _ResponsiveDatatableState extends State<ResponsiveDatatable> {
           * for large screen
           */
         : LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Container(
-                constraints: BoxConstraints.tightFor(width: max(minWidth, constraints.maxWidth)),
-                child: Column(
-                  children: [
-                    //title and actions
-                    if (widget.title != null || widget.actions != null)
-                      Container(
-                        padding: EdgeInsets.all(5),
-                        decoration:
-                            BoxDecoration(border: Border(bottom: BorderSide(color: widget.desktopHeaderTopBorderColor))),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (widget.title != null) widget.title!,
-                            if (widget.actions != null) ...widget.actions!
-                          ],
+            builder: (context, constraints) => Scrollbar(
+              isAlwaysShown: widget.scrollbarAlwaysShown && constraints.maxWidth < minWidth,
+              controller: widget.desktopHorizontalScrollController,
+              child: SingleChildScrollView(
+                controller: widget.desktopHorizontalScrollController,
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                  constraints: BoxConstraints.tightFor(width: max(minWidth, constraints.maxWidth)),
+                  child: Column(
+                    children: [
+                      //title and actions
+                      if (widget.title != null || widget.actions != null)
+                        Container(
+                          padding: EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: widget.desktopHeaderTopBorderColor))),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              if (widget.title != null) widget.title!,
+                              if (widget.actions != null) ...widget.actions!
+                            ],
+                          ),
                         ),
-                      ),
 
-                    //desktopHeader
-                    if (widget.headers != null && widget.headers!.isNotEmpty) desktopHeader(),
+                      //desktopHeader
+                      if (widget.headers != null && widget.headers!.isNotEmpty) desktopHeader(),
 
-                    if (widget.isLoading) LinearProgressIndicator(),
+                      if (widget.isLoading) LinearProgressIndicator(),
 
-                    if (widget.autoHeight) Column(children: desktopList()),
+                      if (widget.autoHeight) Column(children: desktopList()),
 
-                    if (!widget.autoHeight)
-                      // desktopList
-                      if (widget.source != null && widget.source!.isNotEmpty)
-                        Expanded(
-                          child: Container(
-                            child: Scrollbar(
-                              controller: widget.desktopScrollController,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 10.0),
+                      if (!widget.autoHeight)
+                        // desktopList
+                        if (widget.source != null && widget.source!.isNotEmpty)
+                          Expanded(
+                            child: Container(
+                              child: Scrollbar(
+                                controller: widget.desktopScrollController,
+                                isAlwaysShown: widget.scrollbarAlwaysShown,
                                 child: ListView(
                                   controller: widget.desktopScrollController,
                                   children: desktopList(),
@@ -452,18 +481,18 @@ class _ResponsiveDatatableState extends State<ResponsiveDatatable> {
                               ),
                             ),
                           ),
-                        ),
 
-                    //footer
-                    if (widget.footers != null)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [...widget.footers!],
-                      )
-                  ],
+                      //footer
+                      if (widget.footers != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [...widget.footers!],
+                        )
+                    ],
+                  ),
                 ),
               ),
             ),
-        );
+          );
   }
 }

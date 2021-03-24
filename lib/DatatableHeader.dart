@@ -8,6 +8,7 @@ class DatatableHeader {
   bool? show;
   final TextAlign? textAlign;
   final int? flex;
+  final double minWidth;
   final Widget Function(dynamic value)? headerBuilder;
   final Widget Function(dynamic value, Map<String?, dynamic> row)? sourceBuilder;
 
@@ -19,6 +20,7 @@ class DatatableHeader {
     this.show: true,
     this.editable: false,
     this.flex,
+    this.minWidth = 0,
     this.headerBuilder,
     this.sourceBuilder,
   });
@@ -30,6 +32,7 @@ class DatatableHeader {
         show: map['show'],
         textAlign: map['textAlign'],
         flex: map['flex'],
+        minWidth: map['minWidth'],
         headerBuilder: map['headerBuilder'],
         sourceBuilder: map['sourceBuilder'],
       );
@@ -40,6 +43,7 @@ class DatatableHeader {
         "show": this.show,
         "textAlign": this.textAlign,
         "flex": this.flex,
+        "minWidth": this.minWidth,
         "headerBuilder": this.headerBuilder,
         "sourceBuilder": this.sourceBuilder,
       };
